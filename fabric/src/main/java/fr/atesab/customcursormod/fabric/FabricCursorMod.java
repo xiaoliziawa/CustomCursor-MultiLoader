@@ -1,0 +1,320 @@
+package fr.atesab.customcursormod.fabric;
+
+import fr.atesab.customcursormod.common.CursorMod;
+import fr.atesab.customcursormod.common.config.CursorConfig;
+import fr.atesab.customcursormod.common.cursor.CursorClick;
+import fr.atesab.customcursormod.common.cursor.CursorType;
+import fr.atesab.customcursormod.common.cursor.SelectZone;
+import fr.atesab.customcursormod.common.gui.GuiUtils;
+import fr.atesab.customcursormod.common.gui.screen.CommonScreen;
+import fr.atesab.customcursormod.common.gui.screen.CommonScreenHandler;
+import fr.atesab.customcursormod.common.gui.text.StringCommonText;
+import fr.atesab.customcursormod.common.gui.text.TranslationCommonText;
+import fr.atesab.customcursormod.common.gui.widget.CommonButton;
+import fr.atesab.customcursormod.common.gui.widget.CommonElement;
+import fr.atesab.customcursormod.common.gui.widget.CommonTextField;
+import fr.atesab.customcursormod.common.handler.CommonResourceLocation;
+import fr.atesab.customcursormod.common.handler.GameType;
+import fr.atesab.customcursormod.common.utils.I18nHelper;
+import fr.atesab.customcursormod.fabric.command.CustomCursorCommand;
+import fr.atesab.customcursormod.fabric.gui.FabricBasicCommonScreen;
+import fr.atesab.customcursormod.fabric.gui.FabricGuiSelectZone;
+import fr.atesab.customcursormod.fabric.mixin.AbstractContainerScreenAccessor;
+import fr.atesab.customcursormod.fabric.utils.FabricRenderTypes;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ActiveTextCollector;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractButton;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Items;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+public class FabricCursorMod implements ClientModInitializer {
+    private static FabricCursorMod instance;
+    private final CursorMod mod = new CursorMod(GameType.FABRIC);
+
+    static {
+        SelectZone.SUPPLIER.forType(GameType.FABRIC, o -> new FabricGuiSelectZone(o.xPosition, o.yPosition, o.width, o.height));
+        GuiUtils.SUPPLIER.forType(GameType.FABRIC, GuiUtils::new);
+        TranslationCommonText.SUPPLIER.forType(GameType.FABRIC, obj -> new TranslationCommonText(obj.format, obj.args));
+        StringCommonText.SUPPLIER.forType(GameType.FABRIC, StringCommonText::new);
+        CommonResourceLocation.SUPPLIER.forType(GameType.FABRIC, CommonResourceLocation::new);
+        CommonButton.SUPPLIER.forType(GameType.FABRIC, CommonButton::new);
+        CommonTextField.SUPPLIER.forType(GameType.FABRIC, CommonTextField::new);
+        CommonScreen.SUPPLIER.forType(GameType.FABRIC, CommonScreen::new);
+        CommonScreen.SUPPLIER_CURRENT.forType(GameType.FABRIC, v -> {
+            Screen screen = Minecraft.getInstance().screen;
+            if (screen instanceof CommonScreenHandler handler) {
+                return handler.getCommonScreen();
+            }
+            return CommonScreen.createNull();
+        });
+        I18nHelper.SUPPLIER.forType(GameType.FABRIC, obj -> I18n.get(obj.format, obj.args));
+    }
+
+    @Override
+    public void onInitializeClient() {
+        instance = this;
+        ClientCommandRegistrationCallback.EVENT.register(CustomCursorCommand::register);
+
+        ClientTickEvents.START_CLIENT_TICK.register(client -> {
+            mod.waiter.tick();
+            CustomCursorCommand.tick();
+        });
+
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> this.setup());
+
+        ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            mod.forceNextCursor();
+
+            ScreenEvents.afterTick(screen).register(screen1 -> {
+                if (!mod.getCursorClicks().isEmpty() && client.gui == null) {
+                    mod.getCursorClicks().clear();
+                }
+            });
+
+            ScreenMouseEvents.afterMouseClick(screen).register((screen1, mouseButtonEvent, consumed) -> {
+                if (mouseButtonEvent.button() == 0 && mod.getConfig().clickAnimation) {
+                    mod.getCursorClicks().add(new CursorClick(mouseButtonEvent.x(), mouseButtonEvent.y()));
+                    return true;
+                }
+                return false;
+            });
+        });
+    }
+
+    public static void handleScreenRender(Screen screen, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float tickDelta) {
+        if (instance != null) {
+            instance.onDrawScreen(Minecraft.getInstance(), screen, guiGraphics, mouseX, mouseY, tickDelta);
+        }
+    }
+
+    private List<Field[]> getDeclaredField(Class<?> cls) {
+        List<Field[]> fields = new ArrayList<>();
+        fields.add(cls.getDeclaredFields());
+
+        while (!cls.equals(Object.class)) {
+            cls = cls.getSuperclass();
+            fields.add(cls.getDeclaredFields());
+        }
+
+        return fields;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T getFirstFieldOfTypeInto(Class<T> cls, Object obj) {
+        for (Field field : obj.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            if (field.getType() == cls) {
+                try {
+                    return (T) field.get(obj);
+                } catch (IllegalArgumentException | IllegalAccessException ignored) {
+                    return null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isHover(int mouseX, int mouseY, int x, int y, int width, int height) {
+        x = Math.min(x + width, x);
+        y = Math.min(y + height, y);
+        width = Math.abs(width);
+        height = Math.abs(height);
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    private boolean isHoverButton(int mouseX, int mouseY, AbstractButton button) {
+        return button != null
+                && button.visible
+                && button.active
+                && isHover(mouseX, mouseY, button.getX(), button.getY(), button.getWidth(), button.getHeight());
+    }
+
+    private boolean isHoverTextField(int mouseX, int mouseY, EditBox textField) {
+        return textField != null
+                && textField.isVisible()
+                && isHover(mouseX, mouseY, textField.getX(), textField.getY(), textField.getWidth(), textField.getHeight());
+    }
+
+    public void onDrawScreen(Minecraft minecraft, Screen gui, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float tickDelta) {
+        MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
+        bufferSource.getBuffer(FabricRenderTypes.CURSOR());
+
+        CursorType newCursorType = CursorType.POINTER;
+        if (mod.getConfig().dynamicCursor) {
+            if (gui instanceof CommonScreenHandler handle) {
+                CommonScreen commonScreen = handle.getCommonScreen();
+                for (CommonElement element : commonScreen.childrens) {
+                    if (!element.isEnable()) {
+                        continue;
+                    }
+                    if (element.isHover(mouseX, mouseY)) {
+                        if (element instanceof CommonTextField) {
+                            newCursorType = CursorType.BEAM;
+                        } else if (element instanceof CommonButton) {
+                            newCursorType = CursorType.HAND;
+                        } else if (element instanceof SelectZone) {
+                            newCursorType = CursorType.CROSS;
+                        }
+                    }
+                }
+            } else {
+                for (Field[] fieldArray : getDeclaredField(gui.getClass())) {
+                    for (Field field : fieldArray) {
+                        try {
+                            field.setAccessible(true);
+                            Object value = field.get(gui);
+                            if (value == null) {
+                                continue;
+                            }
+
+                            if (value instanceof EditBox editBox) {
+                                if (isHoverTextField(mouseX, mouseY, editBox)) {
+                                    newCursorType = CursorType.BEAM;
+                                }
+                            } else if (value instanceof AbstractButton button) {
+                                if (isHoverButton(mouseX, mouseY, button)) {
+                                    newCursorType = CursorType.HAND;
+                                }
+                            } else if (value instanceof SelectZone selectZone) {
+                                if (isHover(
+                                        mouseX,
+                                        mouseY,
+                                        selectZone.getXPosition(),
+                                        selectZone.getYPosition(),
+                                        selectZone.getWidth(),
+                                        selectZone.getHeight()
+                                ) && selectZone.isEnable()) {
+                                    newCursorType = CursorType.CROSS;
+                                }
+                            } else if (value instanceof Iterable<?> iterable) {
+                                for (Object entry : iterable) {
+                                    if (entry instanceof AbstractButton button) {
+                                        if (isHoverButton(mouseX, mouseY, button)) {
+                                            newCursorType = CursorType.HAND;
+                                        }
+                                    } else if (entry instanceof EditBox editBox) {
+                                        if (isHoverTextField(mouseX, mouseY, editBox)) {
+                                            newCursorType = CursorType.BEAM;
+                                        }
+                                    } else if (entry instanceof SelectZone selectZone) {
+                                        if (selectZone.isHover(mouseX, mouseY) && selectZone.isEnable()) {
+                                            newCursorType = CursorType.CROSS;
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+
+            if (gui instanceof AbstractContainerScreen<?> container) {
+                LocalPlayer player = minecraft.player;
+                if (player != null && !player.containerMenu.getCarried().getItem().equals(Items.AIR)) {
+                    newCursorType = CursorType.HAND_GRAB;
+                } else if (((AbstractContainerScreenAccessor) container).getHoveredSlot() != null
+                        && ((AbstractContainerScreenAccessor) container).getHoveredSlot().hasItem()) {
+                    newCursorType = CursorType.HAND;
+                }
+            } else if (gui instanceof ChatScreen) {
+                Minecraft mc = minecraft;
+                int mx = (int) (mc.mouseHandler.xpos() * (double) mc.getWindow().getGuiScaledWidth()
+                        / (double) mc.getWindow().getScreenWidth());
+                int my = (int) (mc.mouseHandler.ypos() * (double) mc.getWindow().getGuiScaledHeight()
+                        / (double) mc.getWindow().getScreenHeight());
+                ActiveTextCollector.ClickableStyleFinder finder = new ActiveTextCollector.ClickableStyleFinder(mc.font, mx, my);
+                mc.gui.getChat().captureClickableText(
+                        finder,
+                        mc.getWindow().getGuiScaledHeight(),
+                        mc.gui.getGuiTicks(),
+                        ChatComponent.DisplayMode.FOREGROUND
+                );
+                Style style = finder.result();
+                if (style != null && style.getClickEvent() != null) {
+                    newCursorType = CursorType.HAND;
+                }
+            }
+
+            CommonScreen commonScreen;
+            if (gui instanceof CommonScreenHandler handler) {
+                commonScreen = handler.getCommonScreen();
+            } else {
+                commonScreen = new FabricBasicCommonScreen(gui);
+            }
+
+            for (CursorType cursorType : mod.getCursors().keySet()) {
+                if (cursorType.getCursorTester() != null
+                        && cursorType.getCursorTester().testCursor(newCursorType, commonScreen, mouseX, mouseY, tickDelta)) {
+                    newCursorType = cursorType;
+                    break;
+                }
+            }
+        }
+
+        mod.changeCursor(newCursorType);
+
+        if (mod.getConfig().clickAnimation) {
+            Iterator<CursorClick> iterator = mod.getCursorClicks().iterator();
+            while (iterator.hasNext()) {
+                CursorClick cursorClick = iterator.next();
+                int posX = (int) cursorClick.getPosX();
+                int posY = (int) cursorClick.getPosY();
+
+                try {
+                    Identifier texture = Identifier.withDefaultNamespace("textures/gui/click_" + cursorClick.getImage() + ".png");
+                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, texture, posX - 8, posY - 8, 0, 0, 16, 16, 16, 16);
+                } catch (Exception ignored) {
+                }
+
+                cursorClick.descreaseTime(tickDelta);
+                if (cursorClick.getTime() <= 0) {
+                    iterator.remove();
+                }
+            }
+        }
+    }
+
+    private void setup() {
+        File saveDir = new File(Minecraft.getInstance().gameDirectory, "config");
+        try {
+            Files.createDirectories(saveDir.toPath());
+        } catch (IOException e) {
+            throw new RuntimeException("can't create directories: " + saveDir, e);
+        }
+
+        File save = new File(saveDir, CursorMod.MOD_ID + ".json");
+        mod.getConfig().sync(save);
+        mod.getConfig().sync(save);
+        mod.getCursors().values().forEach(CursorConfig::getCursor);
+        mod.loadData(Minecraft.getInstance().getWindow().handle());
+    }
+}
