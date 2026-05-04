@@ -226,7 +226,7 @@ public class NeoForgeCursorMod {
                 LocalPlayer player = gui.getMinecraft().player;
                 if (player != null && !player.containerMenu.getCarried().getItem().equals(Items.AIR))
                     newCursorType = CursorType.HAND_GRAB;
-                else if (container.getSlotUnderMouse() != null && container.getSlotUnderMouse().hasItem())
+                else if (container.getHoveredSlot() != null && container.getHoveredSlot().hasItem())
                     newCursorType = CursorType.HAND;
             } else if (gui instanceof ChatScreen) {
                 // 1.21.11 API: 使用 ActiveTextCollector.ClickableStyleFinder 获取聊天中的可点击样式
