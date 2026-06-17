@@ -20,7 +20,6 @@ import fr.atesab.customcursormod.fabric.command.CustomCursorCommand;
 import fr.atesab.customcursormod.fabric.gui.FabricBasicCommonScreen;
 import fr.atesab.customcursormod.fabric.gui.FabricGuiSelectZone;
 import fr.atesab.customcursormod.fabric.mixin.AbstractContainerScreenAccessor;
-import fr.atesab.customcursormod.fabric.utils.FabricRenderTypes;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -37,7 +36,6 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Style;
@@ -66,7 +64,7 @@ public class FabricCursorMod implements ClientModInitializer {
         CommonTextField.SUPPLIER.forType(GameType.FABRIC, CommonTextField::new);
         CommonScreen.SUPPLIER.forType(GameType.FABRIC, CommonScreen::new);
         CommonScreen.SUPPLIER_CURRENT.forType(GameType.FABRIC, v -> {
-            Screen screen = Minecraft.getInstance().screen;
+            Screen screen = Minecraft.getInstance().gui.screen();
             if (screen instanceof CommonScreenHandler handler) {
                 return handler.getCommonScreen();
             }
@@ -162,9 +160,6 @@ public class FabricCursorMod implements ClientModInitializer {
     }
 
     public void onDrawScreen(Minecraft minecraft, Screen gui, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float tickDelta) {
-        MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
-        bufferSource.getBuffer(FabricRenderTypes.CURSOR());
-
         CursorType newCursorType = CursorType.POINTER;
         if (mod.getConfig().dynamicCursor) {
             if (gui instanceof CommonScreenHandler handle) {
@@ -252,10 +247,10 @@ public class FabricCursorMod implements ClientModInitializer {
                 int my = (int) (mc.mouseHandler.ypos() * (double) mc.getWindow().getGuiScaledHeight()
                         / (double) mc.getWindow().getScreenHeight());
                 ActiveTextCollector.ClickableStyleFinder finder = new ActiveTextCollector.ClickableStyleFinder(mc.font, mx, my);
-                mc.gui.getChat().captureClickableText(
+                mc.gui.hud.getChat().captureClickableText(
                         finder,
                         mc.getWindow().getGuiScaledHeight(),
-                        mc.gui.getGuiTicks(),
+                        mc.gui.hud.getGuiTicks(),
                         ChatComponent.DisplayMode.FOREGROUND
                 );
                 Style style = finder.result();

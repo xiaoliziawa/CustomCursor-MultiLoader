@@ -18,7 +18,6 @@ import fr.atesab.customcursormod.common.utils.I18nHelper;
 import fr.atesab.customcursormod.neoforge.command.CustomCursorCommand;
 import fr.atesab.customcursormod.neoforge.gui.NeoForgeBasicCommonScreen;
 import fr.atesab.customcursormod.neoforge.gui.NeoForgeGuiSelectZone;
-import fr.atesab.customcursormod.neoforge.utils.NeoForgeRenderTypes;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ActiveTextCollector;
 import net.minecraft.client.gui.components.AbstractButton;
@@ -29,7 +28,6 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Style;
@@ -73,7 +71,7 @@ public class NeoForgeCursorMod {
         CommonTextField.SUPPLIER.forType(GameType.FORGE, CommonTextField::new);
         CommonScreen.SUPPLIER.forType(GameType.FORGE, CommonScreen::new);
         CommonScreen.SUPPLIER_CURRENT.forType(GameType.FORGE, v -> {
-            Screen screen = Minecraft.getInstance().screen;
+            Screen screen = Minecraft.getInstance().gui.screen();
             if (screen instanceof CommonScreenHandler handler) {
                 return handler.getCommonScreen();
             }
@@ -161,10 +159,6 @@ public class NeoForgeCursorMod {
 
     @SubscribeEvent
     public void onDrawScreen(ScreenEvent.Render.Post ev) {
-        MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        bufferSource.getBuffer(NeoForgeRenderTypes.CURSOR());
-
-
         Screen gui = ev.getScreen();
         CursorType newCursorType = CursorType.POINTER;
         if (mod.getConfig().dynamicCursor) {
@@ -236,10 +230,10 @@ public class NeoForgeCursorMod {
                 int my = (int) (mc.mouseHandler.ypos() * (double) mc.getWindow().getGuiScaledHeight()
                         / (double) mc.getWindow().getScreenHeight());
                 ActiveTextCollector.ClickableStyleFinder finder = new ActiveTextCollector.ClickableStyleFinder(mc.font, mx, my);
-                mc.gui.getChat().captureClickableText(
+                mc.gui.hud.getChat().captureClickableText(
                         finder,
                         mc.getWindow().getGuiScaledHeight(),
-                        mc.gui.getGuiTicks(),
+                        mc.gui.hud.getGuiTicks(),
                         ChatComponent.DisplayMode.FOREGROUND
                 );
                 Style style = finder.result();
@@ -288,13 +282,13 @@ public class NeoForgeCursorMod {
 
     @SubscribeEvent
     public void onGuiCloses(ClientTickEvent.Post ev) {
-        if (!mod.getCursorClicks().isEmpty() && Minecraft.getInstance().screen == null)
+        if (!mod.getCursorClicks().isEmpty() && Minecraft.getInstance().gui.screen() == null)
             mod.getCursorClicks().clear();
     }
 
     @SubscribeEvent
     public void onTick(ClientTickEvent.Post ev) {
-        checkModList(Minecraft.getInstance().screen);
+        checkModList(Minecraft.getInstance().gui.screen());
         mod.waiter.tick();
     }
 

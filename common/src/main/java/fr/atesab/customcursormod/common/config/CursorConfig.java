@@ -73,7 +73,8 @@ public class CursorConfig {
 	}
 
 	private void allocate() {
-		readImage();
+		if (!readImage())
+			return;
 		if (cursor != MemoryUtil.NULL)
 			freeCursor();
 		cursor = GLFW.glfwCreateCursor(glfwImage, getxHotSpot(), getyHotSpot());
@@ -125,11 +126,13 @@ public class CursorConfig {
 		return cursor != MemoryUtil.NULL;
 	}
 
-	private void readImage() {
+	private boolean readImage() {
 		try {
-			BufferedImage originalImage = ImageIO.read(getResource());
-			if (originalImage == null) return;
-			
+			InputStream resource = getResource();
+			if (resource == null) return false;
+			BufferedImage originalImage = ImageIO.read(resource);
+			if (originalImage == null) return false;
+
 			int originalWidth = originalImage.getWidth();
 			int originalHeight = originalImage.getHeight();
 			
@@ -163,8 +166,10 @@ public class CursorConfig {
 			glfwImage.pixels(buffer);
 			glfwImage.width(scaledWidth);
 			glfwImage.height(scaledHeight);
+			return true;
 		} catch (Exception e) {
 			e.printStackTrace();
+			return false;
 		}
 	}
 

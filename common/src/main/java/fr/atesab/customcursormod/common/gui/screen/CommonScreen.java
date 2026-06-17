@@ -193,7 +193,7 @@ public class CommonScreen {
 	}
 
 	public void displayScreen() {
-		Minecraft.getInstance().setScreen(handle);
+		Minecraft.getInstance().gui.setScreen(handle);
 	}
 
 	public Component getTitle() {

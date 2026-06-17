@@ -31,11 +31,11 @@ public class CustomCursorCommand {
 
             if (scheduledTicks == 0) {
                 Minecraft minecraft = Minecraft.getInstance();
-                CommonScreen parent = new FabricBasicCommonScreen(minecraft.screen);
+                CommonScreen parent = new FabricBasicCommonScreen(minecraft.gui.screen());
                 CommonScreen configScreen = GuiConfig.create(parent);
 
                 if (configScreen instanceof CommonScreen screen) {
-                    minecraft.setScreen(screen.getHandle());
+                    minecraft.gui.setScreen(screen.getHandle());
                 }
             }
         }

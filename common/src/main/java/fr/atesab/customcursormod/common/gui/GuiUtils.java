@@ -1,6 +1,5 @@
 package fr.atesab.customcursormod.common.gui;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import fr.atesab.customcursormod.common.CursorMod;
 import fr.atesab.customcursormod.common.gui.screen.CommonScreen;
 import fr.atesab.customcursormod.common.gui.text.CommonText;
@@ -11,9 +10,7 @@ import fr.atesab.customcursormod.common.utils.Color;
 import fr.atesab.customcursormod.common.utils.I18nHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.resources.Identifier;
 
 import java.util.function.BooleanSupplier;
@@ -155,40 +152,9 @@ public class GuiUtils {
      */
     public void drawGradientRect(CommonMatrixStack stack, int left, int top, int right, int bottom, int rightTopColor,
                                  int leftTopColor, int leftBottomColor, int rightBottomColor, float zLevel) {
-        float alphaRightTop = (float) (rightTopColor >> 24 & 255) / 255.0F;
-        float redRightTop = (float) (rightTopColor >> 16 & 255) / 255.0F;
-        float greenRightTop = (float) (rightTopColor >> 8 & 255) / 255.0F;
-        float blueRightTop = (float) (rightTopColor & 255) / 255.0F;
-        float alphaLeftTop = (float) (leftTopColor >> 24 & 255) / 255.0F;
-        float redLeftTop = (float) (leftTopColor >> 16 & 255) / 255.0F;
-        float greenLeftTop = (float) (leftTopColor >> 8 & 255) / 255.0F;
-        float blueLeftTop = (float) (leftTopColor & 255) / 255.0F;
-        float alphaLeftBottom = (float) (leftBottomColor >> 24 & 255) / 255.0F;
-        float redLeftBottom = (float) (leftBottomColor >> 16 & 255) / 255.0F;
-        float greenLeftBottom = (float) (leftBottomColor >> 8 & 255) / 255.0F;
-        float blueLeftBottom = (float) (leftBottomColor & 255) / 255.0F;
-        float alphaRightBottom = (float) (rightBottomColor >> 24 & 255) / 255.0F;
-        float redRightBottom = (float) (rightBottomColor >> 16 & 255) / 255.0F;
-        float greenRightBottom = (float) (rightBottomColor >> 8 & 255) / 255.0F;
-        float blueRightBottom = (float) (rightBottomColor & 255) / 255.0F;
-
-        MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
-        VertexConsumer vertexBuffer = bufferSource.getBuffer(RenderTypes.debugQuads());
-
-
-        vertexBuffer.addVertex((float) right, (float) top, zLevel)
-                .setColor(redRightTop, greenRightTop, blueRightTop, alphaRightTop);
-
-        vertexBuffer.addVertex((float) left, (float) top, zLevel)
-                .setColor(redLeftTop, greenLeftTop, blueLeftTop, alphaLeftTop);
-
-        vertexBuffer.addVertex((float) left, (float) bottom, zLevel)
-                .setColor(redLeftBottom, greenLeftBottom, blueLeftBottom, alphaLeftBottom);
-
-        vertexBuffer.addVertex((float) right, (float) bottom, zLevel)
-                .setColor(redRightBottom, greenRightBottom, blueRightBottom, alphaRightBottom);
-
-        bufferSource.endBatch();
+        if (currentGuiGraphics != null) {
+            currentGuiGraphics.fillGradient(left, top, right, bottom, leftTopColor, leftBottomColor);
+        }
     }
 
     public int fontHeight() {

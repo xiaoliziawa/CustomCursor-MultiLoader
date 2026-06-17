@@ -14,7 +14,6 @@ public class FabricRenderTypes {
     public static RenderType CURSOR() {
         if (cursor == null) {
             RenderSetup setup = RenderSetup.builder(FabricRenderPipelines.CURSOR.get())
-                    .bufferSize(2048)
                     .createRenderSetup();
             cursor = RenderType.create("cursor", setup);
         }
@@ -27,7 +26,6 @@ public class FabricRenderTypes {
                     identifier -> {
                         RenderSetup setup = RenderSetup.builder(FabricRenderPipelines.CURSOR.get())
                                 .withTexture("Sampler0", identifier)
-                                .bufferSize(2048)
                                 .createRenderSetup();
                         return RenderType.create("cursor_textured", setup);
                     }

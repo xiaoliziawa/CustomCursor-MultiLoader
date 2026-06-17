@@ -22,10 +22,10 @@ public class CustomCursorCommand {
 
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.execute(() -> {
-            CommonScreen parent = new NeoForgeBasicCommonScreen(minecraft.screen);
+            CommonScreen parent = new NeoForgeBasicCommonScreen(minecraft.gui.screen());
             CommonScreen configScreen = GuiConfig.create(parent);
             if (configScreen instanceof CommonScreen screen) {
-                minecraft.setScreen(screen.getHandle());
+                minecraft.gui.setScreen(screen.getHandle());
             }
         });
 
