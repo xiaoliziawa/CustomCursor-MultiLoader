@@ -4,3 +4,21 @@ plugins {
     // see https://projects.neoforged.net/neoforged/moddevgradle for new versions
     id 'net.neoforged.moddev' version '2.0.141' apply false
 }
+
+def loaderProjects = [project(':fabric'), project(':neoforge')]
+def collectedLibsDir = rootProject.layout.projectDirectory.dir('libs')
+
+tasks.register('buildAll', Copy) {
+    group = 'build'
+    description = 'Build the fabric and neoforge modules and collect their mod jars into the root libs folder.'
+
+    dependsOn loaderProjects.collect { "${it.path}:build" }
+
+    loaderProjects.each { p ->
+        from(p.layout.buildDirectory.dir('libs')) {
+            exclude '*-sources.jar'
+            exclude '*-javadoc.jar'
+        }
+    }
+    into collectedLibsDir
+}
