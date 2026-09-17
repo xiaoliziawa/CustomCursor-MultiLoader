@@ -38,7 +38,7 @@ public class CommonScreen {
 			return false;
 		}
 
-		public boolean keyPressed(int key, int scan, int modifier) {
+		public boolean keyPressed(int key, int keycode, int modifier) {
 			// To implement
 			return false;
 		}
@@ -150,11 +150,11 @@ public class CommonScreen {
 		return false;
 	}
 
-	public boolean keyPressed(int key, int scan, int modifier) {
-		if (listener.keyPressed(key, scan, modifier))
+	public boolean keyPressed(int key, int keycode, int modifier) {
+		if (listener.keyPressed(key, keycode, modifier))
 			return true;
 		for (CommonElement e : childrens) {
-			if (e.keyPressed(key, scan, modifier))
+			if (e.keyPressed(key, keycode, modifier))
 				return true;
 		}
 		return false;
@@ -180,12 +180,6 @@ public class CommonScreen {
 		listener.render(stack, mouseX, mouseY, partialTicks);
 		for (CommonElement e : childrens)
 			e.render(stack, mouseX, mouseY, partialTicks);
-	}
-
-	public void renderDefaultBackground(CommonMatrixStack stack) {
-		if (handle.getCurrentGuiGraphics() != null) {
-			handle.renderDefaultBackground(handle.getCurrentGuiGraphics());
-		}
 	}
 
 	public CommonScreenHandler getHandle() {
@@ -241,9 +235,11 @@ public class CommonScreen {
 	}
 
 	public void drawString(CommonMatrixStack stack, String text, float x, float y, int color, float factor) {
+		stack.push();
+		stack.translate(x, y);
 		stack.scale(factor);
-		drawString(stack, text, x / factor, y / factor, color);
-		stack.scaleInv(factor);
+		drawString(stack, text, 0, 0, color);
+		stack.pop();
 	}
 
 	public void drawString(CommonMatrixStack stack, String text, int x, int y, int color) {

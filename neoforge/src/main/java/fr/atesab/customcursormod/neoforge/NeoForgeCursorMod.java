@@ -1,5 +1,6 @@
 package fr.atesab.customcursormod.neoforge;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import fr.atesab.customcursormod.common.CursorMod;
 import fr.atesab.customcursormod.common.config.CursorConfig;
 import fr.atesab.customcursormod.common.cursor.CursorClick;
@@ -21,7 +22,6 @@ import fr.atesab.customcursormod.neoforge.gui.NeoForgeGuiSelectZone;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ActiveTextCollector;
 import net.minecraft.client.gui.components.AbstractButton;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -36,7 +36,6 @@ import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.ModList;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
@@ -44,8 +43,6 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.client.gui.ModListScreen;
-import net.neoforged.neoforge.client.gui.widget.ModListWidget;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.io.File;
@@ -55,7 +52,6 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 
 @Mod(CursorMod.MOD_ID)
 public class NeoForgeCursorMod {
@@ -95,26 +91,6 @@ public class NeoForgeCursorMod {
         );
     }
 
-    private void checkModList(Screen screen) {
-        // enabling the config button
-        if (screen instanceof ModListScreen) {
-            ModListWidget.ModEntry entry = getFirstFieldOfTypeInto(ModListWidget.ModEntry.class, screen);
-            if (entry != null) {
-                var info = entry.getInfo();
-                if (info != null) {
-                    Optional<? extends ModContainer> op = ModList.get().getModContainerById(info.getModId());
-                    if (op.isPresent()) {
-                        boolean value = op.get().getCustomExtension(IConfigScreenFactory.class).isPresent();
-                        String configText = I18n.get("fml.menu.mods.config");
-                        for (var b : screen.children())
-                            if (b instanceof Button && ((Button) b).getMessage().getString().equals(configText))
-                                ((Button) b).active = value;
-                    }
-                }
-            }
-        }
-    }
-
     private List<Field[]> getDeclaredField(Class<?> cls) {
         List<Field[]> l = new ArrayList<>();
         l.add(cls.getDeclaredFields());
@@ -123,20 +99,6 @@ public class NeoForgeCursorMod {
             l.add(cls.getDeclaredFields());
         }
         return l;
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> T getFirstFieldOfTypeInto(Class<T> cls, Object obj) {
-        for (Field f : obj.getClass().getDeclaredFields()) {
-            f.setAccessible(true);
-            if (f.getType() == cls)
-                try {
-                    return (T) f.get(obj);
-                } catch (IllegalArgumentException | IllegalAccessException e) {
-                    return null;
-                }
-        }
-        return null;
     }
 
     private boolean isHover(int mouseX, int mouseY, int x, int y, int width, int height) {
@@ -288,7 +250,6 @@ public class NeoForgeCursorMod {
 
     @SubscribeEvent
     public void onTick(ClientTickEvent.Post ev) {
-        checkModList(Minecraft.getInstance().gui.screen());
         mod.waiter.tick();
     }
 
@@ -299,7 +260,7 @@ public class NeoForgeCursorMod {
 
     @SubscribeEvent
     public void onMouseClicked(ScreenEvent.MouseButtonPressed.Pre ev) {
-        if (ev.getButton() == 0 && mod.getConfig().clickAnimation) {
+        if (ev.getButton() == InputConstants.MOUSE_BUTTON_LEFT && mod.getConfig().clickAnimation) {
             mod.getCursorClicks().add(new CursorClick(ev.getMouseX(), ev.getMouseY()));
         }
     }
@@ -310,6 +271,10 @@ public class NeoForgeCursorMod {
     }
 
     private void setup(FMLLoadCompleteEvent ev) {
+        ev.enqueueWork(this::loadCursors);
+    }
+
+    private void loadCursors() {
         File saveDir = new File(Minecraft.getInstance().gameDirectory, "config");
         try {
             Files.createDirectories(saveDir.toPath());
@@ -320,6 +285,6 @@ public class NeoForgeCursorMod {
         mod.getConfig().sync(save);
         mod.getConfig().sync(save);
         mod.getCursors().values().forEach(CursorConfig::getCursor); // force allocation
-        mod.loadData(Minecraft.getInstance().getWindow().handle());
+        mod.markReady();
     }
 }

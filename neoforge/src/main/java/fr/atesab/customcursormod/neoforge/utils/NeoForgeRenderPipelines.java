@@ -1,6 +1,6 @@
 package fr.atesab.customcursormod.neoforge.utils;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.RenderPipelines;
 
 import java.util.function.Supplier;

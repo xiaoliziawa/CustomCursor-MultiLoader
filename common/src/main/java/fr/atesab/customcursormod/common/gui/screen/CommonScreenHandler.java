@@ -1,6 +1,5 @@
 package fr.atesab.customcursormod.common.gui.screen;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import fr.atesab.customcursormod.common.handler.CommonMatrixStack;
 import fr.atesab.customcursormod.common.gui.GuiUtils;
 import fr.atesab.customcursormod.common.gui.widget.CommonButton;
@@ -55,15 +54,12 @@ public class CommonScreenHandler extends Screen {
         CommonScreen commonScreen = this.getCommonScreen();
 
         for (CommonElement element : commonScreen.childrens) {
-            if (element instanceof CommonButton button) {
+            if (element instanceof CommonButtonValue<?> buttonValue) {
+                this.addRenderableWidget(buttonValue.getHandle().handle);
+            } else if (element instanceof CommonButton button) {
                 this.addRenderableWidget(button.handle);
             } else if (element instanceof CommonTextField textField) {
                 this.addRenderableWidget(textField.handle);
-            } else if (element instanceof CommonButtonValue<?> buttonValue) {
-                CommonButton handle = buttonValue.getHandle();
-                if (handle instanceof CommonButton button) {
-                    this.addRenderableWidget(button.handle);
-                }
             }
         }
     }
@@ -77,8 +73,7 @@ public class CommonScreenHandler extends Screen {
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
 
         if (this.minecraft != null) {
-            PoseStack poseStack = new PoseStack();
-            CommonMatrixStack stack = new CommonMatrixStack(poseStack);
+            CommonMatrixStack stack = new CommonMatrixStack(guiGraphics.pose());
             this.getCommonScreen().listener.render(stack, mouseX, mouseY, partialTicks);
         }
     }
@@ -98,7 +93,7 @@ public class CommonScreenHandler extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        boolean listenerHandled = this.getCommonScreen().listener.keyPressed(event.key(), event.scancode(), event.modifiers());
+        boolean listenerHandled = this.getCommonScreen().listener.keyPressed(event.key(), event.keycode(), event.modifiers());
         boolean superHandled = super.keyPressed(event);
         return listenerHandled || superHandled;
     }
@@ -118,9 +113,5 @@ public class CommonScreenHandler extends Screen {
 
     public Font getTextRenderer() {
         return font;
-    }
-
-    public void renderDefaultBackground(GuiGraphicsExtractor guiGraphics) {
-        this.extractMenuBackground(guiGraphics);
     }
 }

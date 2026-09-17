@@ -1,17 +1,22 @@
 package fr.atesab.customcursormod.common.config;
 
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 
 import javax.imageio.ImageIO;
 
-import org.lwjgl.BufferUtils;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWImage;
+import org.lwjgl.sdl.SDLMouse;
+import org.lwjgl.sdl.SDLPixels;
+import org.lwjgl.sdl.SDLSurface;
+import org.lwjgl.sdl.SDL_Surface;
 import org.lwjgl.system.MemoryUtil;
 
 import fr.atesab.customcursormod.common.handler.CommonResourceLocation;
+import fr.atesab.customcursormod.common.utils.MathHelper;
 
 public class CursorConfig {
 	public static class CursorConfigStore {
@@ -52,8 +57,6 @@ public class CursorConfig {
 	private int size = 32; // 默认大小为32像素
 	private long cursor = MemoryUtil.NULL;
 
-	private GLFWImage glfwImage = GLFWImage.create();
-
 	private CursorConfig() {
 	}
 
@@ -73,11 +76,33 @@ public class CursorConfig {
 	}
 
 	private void allocate() {
-		if (!readImage())
+		BufferedImage image = readImage();
+		if (image == null)
 			return;
 		if (cursor != MemoryUtil.NULL)
 			freeCursor();
-		cursor = GLFW.glfwCreateCursor(glfwImage, getxHotSpot(), getyHotSpot());
+		cursor = createCursor(image);
+	}
+
+	private long createCursor(BufferedImage image) {
+		int width = image.getWidth();
+		int height = image.getHeight();
+		SDL_Surface surface = SDLSurface.SDL_CreateSurface(width, height, SDLPixels.SDL_PIXELFORMAT_ARGB8888);
+		if (surface == null)
+			return MemoryUtil.NULL;
+		try {
+			int[] argb = image.getRGB(0, 0, width, height, null, 0, width);
+			IntBuffer pixels = surface.pixels().order(ByteOrder.nativeOrder()).asIntBuffer();
+			int rowStride = surface.pitch() / Integer.BYTES;
+			for (int y = 0; y < height; y++) {
+				pixels.position(y * rowStride);
+				pixels.put(argb, y * width, width);
+			}
+			return SDLMouse.SDL_CreateColorCursor(surface, MathHelper.clamp(xHotSpot, 0, width - 1),
+					MathHelper.clamp(yHotSpot, 0, height - 1));
+		} finally {
+			SDLSurface.SDL_DestroySurface(surface);
+		}
 	}
 
 	public CursorConfig copy() {
@@ -86,8 +111,10 @@ public class CursorConfig {
 	}
 
 	public void freeCursor() {
-		if (isAllocate())
-			GLFW.glfwDestroyCursor(cursor);
+		if (isAllocate()) {
+			SDLMouse.SDL_DestroyCursor(cursor);
+			cursor = MemoryUtil.NULL;
+		}
 	}
 
 	public long getCursor() {
@@ -126,50 +153,22 @@ public class CursorConfig {
 		return cursor != MemoryUtil.NULL;
 	}
 
-	private boolean readImage() {
-		try {
-			InputStream resource = getResource();
-			if (resource == null) return false;
+	private BufferedImage readImage() {
+		try (InputStream resource = getResource()) {
+			if (resource == null) return null;
 			BufferedImage originalImage = ImageIO.read(resource);
-			if (originalImage == null) return false;
+			if (originalImage == null) return null;
 
-			int originalWidth = originalImage.getWidth();
-			int originalHeight = originalImage.getHeight();
-			
-			// 计算缩放后的尺寸
-			float scale = (float)size / (float)originalWidth;
-			int scaledWidth = size;
-			int scaledHeight = (int)(originalHeight * scale);
-			
-			// 创建缩放后的图像
-			BufferedImage scaledImage = new BufferedImage(scaledWidth, scaledHeight, BufferedImage.TYPE_INT_ARGB);
-			java.awt.Graphics2D g2d = scaledImage.createGraphics();
-			g2d.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-				java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-			g2d.drawImage(originalImage, 0, 0, scaledWidth, scaledHeight, null);
-			g2d.dispose();
-			
-			int[] pixels = new int[scaledWidth * scaledHeight];
-			scaledImage.getRGB(0, 0, scaledWidth, scaledHeight, pixels, 0, scaledWidth);
-			ByteBuffer buffer = BufferUtils.createByteBuffer(scaledWidth * scaledHeight * 4);
-			
-			for (int y = 0; y < scaledHeight; y++) {
-				for (int x = 0; x < scaledWidth; x++) {
-					int pixel = pixels[y * scaledWidth + x];
-					buffer.put((byte) ((pixel >> 16) & 0xFF)); // red
-					buffer.put((byte) ((pixel >> 8) & 0xFF));  // green
-					buffer.put((byte) (pixel & 0xFF));         // blue
-					buffer.put((byte) ((pixel >> 24) & 0xFF)); // alpha
-				}
-			}
-			buffer.flip();
-			glfwImage.pixels(buffer);
-			glfwImage.width(scaledWidth);
-			glfwImage.height(scaledHeight);
-			return true;
+			int scaledHeight = (int) (originalImage.getHeight() * ((float) size / originalImage.getWidth()));
+			BufferedImage scaledImage = new BufferedImage(size, scaledHeight, BufferedImage.TYPE_INT_ARGB);
+			Graphics2D graphics = scaledImage.createGraphics();
+			graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			graphics.drawImage(originalImage, 0, 0, size, scaledHeight, null);
+			graphics.dispose();
+			return scaledImage;
 		} catch (Exception e) {
 			e.printStackTrace();
-			return false;
+			return null;
 		}
 	}
 

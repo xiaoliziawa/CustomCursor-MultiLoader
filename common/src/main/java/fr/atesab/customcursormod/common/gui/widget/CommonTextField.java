@@ -141,8 +141,8 @@ public class CommonTextField implements CommonElement {
 	}
 
 	@Override
-	public boolean keyPressed(int key, int scan, int modifier) {
-		KeyEvent event = new KeyEvent(key, scan, modifier);
+	public boolean keyPressed(int key, int keycode, int modifier) {
+		KeyEvent event = new KeyEvent(key, keycode, modifier);
 		return handle.keyPressed(event);
 	}
 }

@@ -16,7 +16,7 @@ public interface CommonElement {
 	default boolean charTyped(char key, int modifier) {
 		return false;
 	}
-	default boolean keyPressed(int key, int scan, int modifier) {
+	default boolean keyPressed(int key, int keycode, int modifier) {
 		return false;
 	}
 	default boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {

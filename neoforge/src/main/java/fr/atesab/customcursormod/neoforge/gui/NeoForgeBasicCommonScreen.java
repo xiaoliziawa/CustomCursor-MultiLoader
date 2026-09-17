@@ -14,11 +14,6 @@ public class NeoForgeBasicCommonScreen extends CommonScreen {
 		this.handle = handle;
 	}
 
-	@Override
-	public void renderDefaultBackground(CommonMatrixStack stack) {
-		throw new UnsupportedOperationException("renderDefaultBackground");
-	}
-
     @Override
     public CommonScreenHandler getHandle() {
         return (CommonScreenHandler) handle;

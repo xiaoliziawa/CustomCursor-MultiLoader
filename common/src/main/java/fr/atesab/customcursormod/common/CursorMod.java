@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import fr.atesab.customcursormod.common.utils.PlatformHelper;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLMouse;
 import org.lwjgl.system.MemoryUtil;
 
 import fr.atesab.customcursormod.common.config.Configuration;
@@ -32,7 +32,7 @@ public class CursorMod {
 	private List<CursorClick> cursorClicks;
 	private Configuration config;
 	private GameType type;
-	private long windowHandle;
+	private boolean ready;
 
 	/**
 	 * @return the instance
@@ -59,8 +59,8 @@ public class CursorMod {
 		return type;
 	}
 
-	public void loadData(long windowHandle) {
-		this.windowHandle = windowHandle;
+	public void markReady() {
+		this.ready = true;
 	}
 
 	public void changeCursor(CursorType cursor) {
@@ -76,15 +76,18 @@ public class CursorMod {
 	}
 
 	public void applyCursor() {
-		if (windowHandle == 0 || cursors == null || currentCursorType == null) {
+		if (!ready || cursors == null || currentCursorType == null) {
 			return;
 		}
 
 		try {
-			CursorConfig cursorConfig = cursors.getOrDefault(currentCursorType, currentCursorType.getDefaultConfig());
+			CursorConfig cursorConfig = cursors.get(currentCursorType);
+			if (cursorConfig == null) {
+				return;
+			}
 			long cursorPtr = cursorConfig.getCursor();
 			if (cursorPtr != MemoryUtil.NULL) {
-				GLFW.glfwSetCursor(windowHandle, cursorPtr);
+				SDLMouse.SDL_SetCursor(cursorPtr);
 			}
 		} catch (Exception e) {
 		}

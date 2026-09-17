@@ -79,7 +79,6 @@ public class GuiConfigCursorMod extends ScreenListener {
 	@Override
 	public void render(CommonMatrixStack stack, int mouseX, int mouseY, float partialTicks) {
 		CommonScreen screen = getScreen();
-		screen.renderDefaultBackground(stack);
 		screen.drawCenterString(stack, I18nHelper.get("cursormod.gui.cursorList"), width / 2,
 				height / 2 - ((elementByPage / 2 + 1) * 21 + 2 + GuiUtils.get().fontHeight()), Color.ORANGE);
 		for (int i = page * elementByPage; i < cursorButtons.size() && i < (page + 1) * elementByPage; i++) {

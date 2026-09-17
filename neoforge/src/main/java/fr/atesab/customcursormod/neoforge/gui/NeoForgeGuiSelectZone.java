@@ -108,7 +108,7 @@ public class NeoForgeGuiSelectZone extends SelectZone implements GuiEventListene
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		return super.keyPressed(event.key(), event.scancode(), event.modifiers());
+		return super.keyPressed(event.key(), event.keycode(), event.modifiers());
 	}
 
 	@Override

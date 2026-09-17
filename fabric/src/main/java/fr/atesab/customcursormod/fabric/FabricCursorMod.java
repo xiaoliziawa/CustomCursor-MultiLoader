@@ -1,10 +1,12 @@
 package fr.atesab.customcursormod.fabric;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import fr.atesab.customcursormod.common.CursorMod;
 import fr.atesab.customcursormod.common.config.CursorConfig;
 import fr.atesab.customcursormod.common.cursor.CursorClick;
 import fr.atesab.customcursormod.common.cursor.CursorType;
 import fr.atesab.customcursormod.common.cursor.SelectZone;
+import fr.atesab.customcursormod.common.gui.GuiConfig;
 import fr.atesab.customcursormod.common.gui.GuiUtils;
 import fr.atesab.customcursormod.common.gui.screen.CommonScreen;
 import fr.atesab.customcursormod.common.gui.screen.CommonScreenHandler;
@@ -95,7 +97,7 @@ public class FabricCursorMod implements ClientModInitializer {
             });
 
             ScreenMouseEvents.afterMouseClick(screen).register((screen1, mouseButtonEvent, consumed) -> {
-                if (mouseButtonEvent.button() == 0 && mod.getConfig().clickAnimation) {
+                if (mouseButtonEvent.button() == InputConstants.MOUSE_BUTTON_LEFT && mod.getConfig().clickAnimation) {
                     mod.getCursorClicks().add(new CursorClick(mouseButtonEvent.x(), mouseButtonEvent.y()));
                     return true;
                 }
@@ -108,6 +110,10 @@ public class FabricCursorMod implements ClientModInitializer {
         if (instance != null) {
             instance.onDrawScreen(Minecraft.getInstance(), screen, guiGraphics, mouseX, mouseY, tickDelta);
         }
+    }
+
+    public static Screen createConfigScreen(Screen parent) {
+        return GuiConfig.create(new FabricBasicCommonScreen(parent)).getHandle();
     }
 
     private List<Field[]> getDeclaredField(Class<?> cls) {
@@ -310,6 +316,6 @@ public class FabricCursorMod implements ClientModInitializer {
         mod.getConfig().sync(save);
         mod.getConfig().sync(save);
         mod.getCursors().values().forEach(CursorConfig::getCursor);
-        mod.loadData(Minecraft.getInstance().getWindow().handle());
+        mod.markReady();
     }
 }

@@ -57,8 +57,7 @@ public class GuiCursorConfig extends ScreenListener {
 	public void render(CommonMatrixStack stack, int mouseX, int mouseY, float partialTicks) {
 		CommonScreen screen = getScreen();
 		GuiUtils gutils = GuiUtils.get();
-		
-		screen.renderDefaultBackground(stack);
+
 		screen.drawCenterString(stack, type.getName(), width / 2 - 74, height / 2 - 41 - 21, Color.ORANGE, 2);
 		screen.drawRightString(stack, I18nHelper.get("cursormod.config.xhotspot") + " : ", xhotspot.getXPosition(),
 				xhotspot.getYPosition() + xhotspot.getHeight() / 2 - gutils.fontHeight() / 2, Color.WHITE);

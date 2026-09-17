@@ -15,11 +15,6 @@ public class FabricBasicCommonScreen extends CommonScreen {
     }
 
     @Override
-    public void renderDefaultBackground(CommonMatrixStack stack) {
-        throw new UnsupportedOperationException("renderDefaultBackground");
-    }
-
-    @Override
     public CommonScreenHandler getHandle() {
         return (CommonScreenHandler) handle;
     }

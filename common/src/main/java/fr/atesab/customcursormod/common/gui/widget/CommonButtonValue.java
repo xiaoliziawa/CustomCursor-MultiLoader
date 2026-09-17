@@ -117,8 +117,8 @@ public class CommonButtonValue<T> extends CommonButton {
 	}
 
 	@Override
-	public boolean keyPressed(int key, int scan, int modifier) {
-		return handle.keyPressed(key, scan, modifier);
+	public boolean keyPressed(int key, int keycode, int modifier) {
+		return handle.keyPressed(key, keycode, modifier);
 	}
 
 	@Override

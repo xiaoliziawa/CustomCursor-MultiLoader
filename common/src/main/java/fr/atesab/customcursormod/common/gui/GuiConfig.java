@@ -53,7 +53,6 @@ public class GuiConfig extends ScreenListener {
 
 	@Override
 	public void render(CommonMatrixStack stack, int mouseX, int mouseY, float partialTicks) {
-		getScreen().renderDefaultBackground(stack);
 		GuiUtils.get().drawConfigTitle(stack, getScreen(), width, height);
 		super.render(stack, mouseX, mouseY, partialTicks);
 	}

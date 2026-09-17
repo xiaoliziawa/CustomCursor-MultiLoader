@@ -13,6 +13,9 @@
   "entrypoints": {
     "client": [
       "fr.atesab.customcursormod.fabric.FabricCursorMod"
+    ],
+    "modmenu": [
+      "fr.atesab.customcursormod.fabric.compat.ModMenuIntegration"
     ]
   },
   "mixins": [
