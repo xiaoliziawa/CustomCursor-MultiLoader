@@ -29,6 +29,7 @@ public class CursorMod {
 	private boolean forceNextCursor;
 	private CursorType currentCursorType;
 	private Map<CursorType, CursorConfig> cursors;
+	private final List<CursorType> cursorTesterTypes = new ArrayList<>();
 	private List<CursorClick> cursorClicks;
 	private Configuration config;
 	private GameType type;
@@ -61,6 +62,7 @@ public class CursorMod {
 
 	public void markReady() {
 		this.ready = true;
+		forceNextCursor();
 	}
 
 	public void changeCursor(CursorType cursor) {
@@ -97,7 +99,7 @@ public class CursorMod {
 	 * Force the next cursor to change (if config were change for example)
 	 */
 	public void forceNextCursor() {
-		forceNextCursor = config.dynamicCursor;
+		forceNextCursor = true;
 	}
 
 	/**
@@ -120,8 +122,16 @@ public class CursorMod {
 	 * @param cursorTypes the cursors
 	 */
 	public void registerCursor(CursorType... cursorTypes) {
-		for (CursorType cursorType : cursorTypes)
+		for (CursorType cursorType : cursorTypes) {
 			cursors.put(cursorType, cursorType.getDefaultConfig());
+			if (cursorType.getCursorTester() != null && !cursorTesterTypes.contains(cursorType)) {
+				cursorTesterTypes.add(cursorType);
+			}
+		}
+	}
+
+	public List<CursorType> getCursorTesterTypes() {
+		return cursorTesterTypes;
 	}
 
 	/**

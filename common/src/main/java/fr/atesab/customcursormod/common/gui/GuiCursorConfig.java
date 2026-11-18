@@ -1,10 +1,13 @@
 package fr.atesab.customcursormod.common.gui;
 
 import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import javax.imageio.ImageIO;
 
+import fr.atesab.customcursormod.common.CursorMod;
 import fr.atesab.customcursormod.common.config.CursorConfig;
 import fr.atesab.customcursormod.common.cursor.CursorType;
 import fr.atesab.customcursormod.common.cursor.SelectZone;
@@ -14,11 +17,18 @@ import fr.atesab.customcursormod.common.gui.text.TranslationCommonText;
 import fr.atesab.customcursormod.common.gui.widget.CommonButton;
 import fr.atesab.customcursormod.common.gui.widget.CommonTextField;
 import fr.atesab.customcursormod.common.handler.CommonMatrixStack;
+import fr.atesab.customcursormod.common.handler.CommonResourceLocation;
 import fr.atesab.customcursormod.common.utils.Color;
 import fr.atesab.customcursormod.common.utils.I18nHelper;
 import fr.atesab.customcursormod.common.utils.MathHelper;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 
 public class GuiCursorConfig extends ScreenListener {
+	public static final Identifier IMAGE_RELOAD_ID = Identifier.fromNamespaceAndPath(CursorMod.MOD_ID, "cursor_preview");
+	private static volatile long imageVersion;
+	public static final ResourceManagerReloadListener IMAGE_RELOAD_LISTENER = resourceManager -> imageVersion++;
+
 	public static CommonScreen create(CommonScreen parent, CursorType type, CursorConfig cursorConfig,
 									  Consumer<CursorConfig> saveCallback) {
 		return CommonScreen.create(parent, TranslationCommonText.create("cursormod.gui.cursorList"),
@@ -35,6 +45,10 @@ public class GuiCursorConfig extends ScreenListener {
 	private int imageHeight = 1;
 	private int totalImageHeight = 1; // 图像总高度
 	private int numImage = 1;
+	private String cachedImageLink;
+	private long cachedImageVersion;
+	private boolean imageValid;
+	private CommonResourceLocation imageLocation;
 	private final CursorType type;
 	private CursorConfig cursorConfig;
 	private Consumer<CursorConfig> callback;
@@ -71,7 +85,7 @@ public class GuiCursorConfig extends ScreenListener {
 			// 使用GuiUtils中的方法绘制预览区域
 			gutils.drawPreviewArea(stack, screen, width / 2 + 36, height / 2 - 64, 128, 128);
 			
-			cursorConfig.getResourceLocation().setShaderTexture();
+			imageLocation.setShaderTexture();
 			// 只渲染第一帧，参数：位置, UV起始, UV尺寸, 渲染尺寸, 纹理总尺寸
 			gutils.drawScaledCustomSizeModalRect(width / 2 + 36, height / 2 - 64, 0, 0, imageWidth, imageHeight, 128,
 					128, imageWidth, totalImageHeight, 0xffffffff, true);
@@ -208,13 +222,31 @@ public class GuiCursorConfig extends ScreenListener {
 	}
 
 	private boolean syncImageSize() {
+		String link = cursorConfig.getLink();
+		long version = imageVersion;
+		if (Objects.equals(link, cachedImageLink) && cachedImageVersion == version) {
+			return imageValid;
+		}
+		cachedImageLink = link;
+		cachedImageVersion = version;
+		imageValid = false;
 		try {
-			BufferedImage image = ImageIO.read(cursorConfig.getResource());
-			imageWidth = image.getWidth();
-			imageHeight = image.getWidth(); // 单帧高度（正方形）
-			totalImageHeight = image.getHeight(); // 总高度（包含所有帧）
-			numImage = image.getHeight() / image.getWidth();
-			return true;
+			imageLocation = cursorConfig.getResourceLocation();
+			try (InputStream resource = imageLocation.openStream()) {
+				if (resource == null) {
+					return false;
+				}
+				BufferedImage image = ImageIO.read(resource);
+				if (image == null) {
+					return false;
+				}
+				imageWidth = image.getWidth();
+				imageHeight = image.getWidth(); // 单帧高度（正方形）
+				totalImageHeight = image.getHeight(); // 总高度（包含所有帧）
+				numImage = image.getHeight() / image.getWidth();
+			}
+			imageValid = true;
+			return imageValid;
 		} catch (Exception e) {
 			return false;
 		}
@@ -227,6 +259,10 @@ public class GuiCursorConfig extends ScreenListener {
 	}
 
 	private void verifyValue() {
+		String link = cursorLocation.getValue();
+		if (!Objects.equals(link, cursorConfig.getLink())) {
+			cursorConfig.setLink(link);
+		}
 		boolean canLeave = syncImageSize();
 		try {
 			cursorConfig.setxHotSpot(Integer.valueOf(xhotspot.getValue()));
@@ -265,7 +301,6 @@ public class GuiCursorConfig extends ScreenListener {
 			cursorSize.setTextColor(Color.RED);
 			canLeave = false;
 		}
-		cursorConfig.setLink(cursorLocation.getValue());
 		doneButton.setEnable(canLeave);
 	}
 }

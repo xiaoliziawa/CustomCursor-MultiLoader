@@ -2,7 +2,8 @@ package fr.atesab.customcursormod.neoforge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import fr.atesab.customcursormod.common.CursorMod;
-import fr.atesab.customcursormod.common.config.CursorConfig;
+import fr.atesab.customcursormod.common.client.CursorScreenHelper;
+import fr.atesab.customcursormod.common.config.Configuration;
 import fr.atesab.customcursormod.common.cursor.CursorClick;
 import fr.atesab.customcursormod.common.cursor.CursorType;
 import fr.atesab.customcursormod.common.cursor.SelectZone;
@@ -12,7 +13,6 @@ import fr.atesab.customcursormod.common.gui.screen.CommonScreenHandler;
 import fr.atesab.customcursormod.common.gui.text.StringCommonText;
 import fr.atesab.customcursormod.common.gui.text.TranslationCommonText;
 import fr.atesab.customcursormod.common.gui.widget.CommonButton;
-import fr.atesab.customcursormod.common.gui.widget.CommonElement;
 import fr.atesab.customcursormod.common.gui.widget.CommonTextField;
 import fr.atesab.customcursormod.common.handler.*;
 import fr.atesab.customcursormod.common.utils.I18nHelper;
@@ -21,9 +21,8 @@ import fr.atesab.customcursormod.neoforge.gui.NeoForgeBasicCommonScreen;
 import fr.atesab.customcursormod.neoforge.gui.NeoForgeGuiSelectZone;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ActiveTextCollector;
-import net.minecraft.client.gui.components.AbstractButton;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ChatComponent;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -33,12 +32,14 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Items;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModLoadingContext;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
+import net.neoforged.neoforge.client.event.AddClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
@@ -47,15 +48,13 @@ import net.neoforged.neoforge.common.NeoForge;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
-@Mod(CursorMod.MOD_ID)
+@Mod(value = CursorMod.MOD_ID, dist = Dist.CLIENT)
 public class NeoForgeCursorMod {
     private final CursorMod mod = new CursorMod(GameType.FORGE);
+    private final CursorScreenHelper cursorScreens = new CursorScreenHelper(NeoForgeBasicCommonScreen::new);
 
     static {
         SelectZone.SUPPLIER.forType(GameType.FORGE, o -> new NeoForgeGuiSelectZone(o.xPosition, o.yPosition, o.width, o.height));
@@ -78,6 +77,7 @@ public class NeoForgeCursorMod {
 
     public NeoForgeCursorMod(IEventBus eventBus) {
         eventBus.addListener(this::setup);
+        eventBus.addListener(this::registerReloadListeners);
         NeoForge.EVENT_BUS.register(this);
         ModLoadingContext.get().registerExtensionPoint(
                 IConfigScreenFactory.class,
@@ -91,93 +91,17 @@ public class NeoForgeCursorMod {
         );
     }
 
-    private List<Field[]> getDeclaredField(Class<?> cls) {
-        List<Field[]> l = new ArrayList<>();
-        l.add(cls.getDeclaredFields());
-        while (!cls.equals(Object.class)) {
-            cls = cls.getSuperclass();
-            l.add(cls.getDeclaredFields());
-        }
-        return l;
-    }
-
-    private boolean isHover(int mouseX, int mouseY, int x, int y, int width, int height) {
-        x = Math.min(x + width, x);
-        y = Math.min(y + height, y);
-        width = Math.abs(width);
-        height = Math.abs(height);
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-    }
-
-    private boolean isHoverButton(int mouseX, int mouseY, AbstractButton button) {
-        return button != null && button.visible && button.active
-                && isHover(mouseX, mouseY, button.getX(), button.getY(), button.getWidth(), button.getHeight());
-    }
-
-    private boolean isHoverTextField(int mouseX, int mouseY, EditBox textField) {
-        return textField != null && textField.isVisible()
-                && isHover(mouseX, mouseY, textField.getX(), textField.getY(), textField.getWidth(), textField.getHeight());
-    }
-
     @SubscribeEvent
     public void onDrawScreen(ScreenEvent.Render.Post ev) {
         Screen gui = ev.getScreen();
+        int mouseX = ev.getMouseX();
+        int mouseY = ev.getMouseY();
+        float partialTick = ev.getPartialTick();
+        GuiGraphicsExtractor guiGraphics = ev.getGuiGraphics();
+        Configuration config = mod.getConfig();
         CursorType newCursorType = CursorType.POINTER;
-        if (mod.getConfig().dynamicCursor) {
-            if (gui instanceof CommonScreenHandler handle) { // Our menu
-                CommonScreen cs = handle.getCommonScreen();
-                for (CommonElement o : cs.childrens) {
-                    if (!o.isEnable())
-                        continue;
-                    if (o.isHover(ev.getMouseX(), ev.getMouseY())) {
-                        if (o instanceof CommonTextField) {
-                            newCursorType = CursorType.BEAM;
-                        } else if (o instanceof CommonButton) {
-                            newCursorType = CursorType.HAND;
-                        } else if (o instanceof SelectZone) {
-                            newCursorType = CursorType.CROSS;
-                        }
-                    }
-                }
-            } else
-                for (Field[] fa : getDeclaredField(gui.getClass()))
-                    for (Field f : fa) {
-                        try {
-                            f.setAccessible(true);
-                            Object o = f.get(gui);
-                            if (o == null) {
-                                continue;
-                            }
-
-                            if (o instanceof EditBox) {
-                                if (isHoverTextField(ev.getMouseX(), ev.getMouseY(), (EditBox) o))
-                                    newCursorType = CursorType.BEAM;
-                            } else if (o instanceof AbstractButton b) {
-                                if (isHoverButton(ev.getMouseX(), ev.getMouseY(), b))
-                                    newCursorType = CursorType.HAND;
-                            } else if (o instanceof SelectZone selectZone) {
-                                if (isHover(ev.getMouseX(), ev.getMouseY(), selectZone.getXPosition(),
-                                        selectZone.getYPosition(), selectZone.getWidth(), selectZone.getHeight())
-                                        && selectZone.isEnable())
-                                    newCursorType = CursorType.CROSS;
-                            } else if (o instanceof Iterable) {
-                                for (Object e : (Iterable<?>) o)
-                                    if (e instanceof AbstractButton b) {
-                                        if (isHoverButton(ev.getMouseX(), ev.getMouseY(), b))
-                                            newCursorType = CursorType.HAND;
-                                    } else if (e instanceof EditBox b) {
-                                        if (isHoverTextField(ev.getMouseX(), ev.getMouseY(), b))
-                                            newCursorType = CursorType.BEAM;
-                                    } else if (e instanceof SelectZone selectZone) {
-                                        if (selectZone.isHover(ev.getMouseX(), ev.getMouseY()) && selectZone.isEnable())
-                                            newCursorType = CursorType.CROSS;
-                                    } else
-                                        break;
-                            }
-                        } catch (Exception e) {
-                            // ignore
-                        }
-                    }
+        if (config.dynamicCursor) {
+            newCursorType = CursorScreenHelper.getHoveredCursor(gui, mouseX, mouseY);
             if (gui instanceof AbstractContainerScreen<?> container) {
                 LocalPlayer player = gui.getMinecraft().player;
                 if (player != null && !player.containerMenu.getCarried().getItem().equals(Items.AIR))
@@ -203,24 +127,12 @@ public class NeoForgeCursorMod {
                     newCursorType = CursorType.HAND;
             }
 
-            CommonScreen commonScreen;
-            if (gui instanceof CommonScreenHandler handler) {
-                commonScreen = handler.getCommonScreen();
-            } else {
-                commonScreen = new NeoForgeBasicCommonScreen(gui);
-            }
-
-            for (CursorType cursorType : mod.getCursors().keySet())
-                if (cursorType.getCursorTester() != null && cursorType.getCursorTester().testCursor(newCursorType,
-                        commonScreen, ev.getMouseX(), ev.getMouseY(), ev.getPartialTick())) {
-                    newCursorType = cursorType;
-                    break;
-                }
+            newCursorType = cursorScreens.testCursor(mod, newCursorType, gui, mouseX, mouseY, partialTick);
         }
         mod.changeCursor(newCursorType);
 
 
-        if (mod.getConfig().clickAnimation) {
+        if (config.clickAnimation) {
             Iterator<CursorClick> iterator = mod.getCursorClicks().iterator();
             while (iterator.hasNext()) {
                 CursorClick cursorClick = iterator.next();
@@ -229,12 +141,12 @@ public class NeoForgeCursorMod {
                 
                 try {
                     Identifier texture = Identifier.withDefaultNamespace("textures/gui/click_" + cursorClick.getImage() + ".png");
-                    ev.getGuiGraphics().blit(RenderPipelines.GUI_TEXTURED, texture, posX - 8, posY - 8, 0, 0, 16, 16, 16, 16);
+                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, texture, posX - 8, posY - 8, 0, 0, 16, 16, 16, 16);
                 } catch (Exception e) {
                     // 静默处理异常
                 }
 
-                cursorClick.descreaseTime(ev.getPartialTick());
+                cursorClick.descreaseTime(partialTick);
                 if (cursorClick.getTime() <= 0) {
                     iterator.remove();
                 }
@@ -274,6 +186,10 @@ public class NeoForgeCursorMod {
         ev.enqueueWork(this::loadCursors);
     }
 
+    private void registerReloadListeners(AddClientReloadListenersEvent event) {
+        event.addListener(GuiCursorConfig.IMAGE_RELOAD_ID, GuiCursorConfig.IMAGE_RELOAD_LISTENER);
+    }
+
     private void loadCursors() {
         File saveDir = new File(Minecraft.getInstance().gameDirectory, "config");
         try {
@@ -283,8 +199,6 @@ public class NeoForgeCursorMod {
         }
         File save = new File(saveDir, CursorMod.MOD_ID + ".json");
         mod.getConfig().sync(save);
-        mod.getConfig().sync(save);
-        mod.getCursors().values().forEach(CursorConfig::getCursor); // force allocation
         mod.markReady();
     }
 }
